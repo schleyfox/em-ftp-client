@@ -1,0 +1,7 @@
+module Em
+  module Ftp
+    module Client
+      VERSION = "0.0.1"
+    end
+  end
+end
