@@ -152,11 +152,24 @@ class ControlConnectionTest < Test::Unit::TestCase
     started = false
     working_dir = nil
 
+    @data_host = "127.0.0.1"
+    @data_port = 56789
+
+    @data_host_string = "127,0,0,1,221,213"
+    
+    @data_connection = EM::FtpClient::DataConnection.new(:foo)
+    EventMachine.expects(:connect).with(@data_host, @data_port, 
+                                        EM::FtpClient::DataConnection).
+                                   returns(@data_connection)
+
+    pasv_callback_called = false
+
     [[nil, nil, "220 Come on in"],
      [nil, "USER kingsly", "331 Cool"],
      [nil, "PASS password", "230 Awesome"],
      [nil, "TYPE I", "200 So Say We All", lambda { started = true }],
-     [[:pwd], "PWD", "257 \"/foo\"", lambda{|d| working_dir = d }]].each do |set|
+     [[:pwd], "PWD", "257 \"/foo\"", lambda{|d| working_dir = d }],
+     [[:pasv], "PASV", "227 =#{@data_host_string}", lambda{ pasv_callback_called }]].each do |set|
       @control_connection.expects(:send_data).with(set[1]+"\r\n") if set[1]
     end.each do |set|
       @control_connection.callback(&set[3]) if set[3]
@@ -164,10 +177,20 @@ class ControlConnectionTest < Test::Unit::TestCase
       @control_connection.receive_line(set[2]+"\r\n") if set[2]
     end
 
+    @control_connection.expects(:send_data).with("RETR foo.txt\r\n")
+    @control_connection.retr("foo.txt")
+
+    retr_completed = false
+    @control_connection.callback {|data| assert_equal "Bar", data; retr_completed = true }
+    assert !retr_completed
+    @control_connection.receive_line("226 Hooray\r\n")
+    assert !retr_completed
+    @data_connection.receive_data("Bar")
+    @data_connection.unbind
+    assert retr_completed
+
     assert started
     assert_equal "\"/foo\"", working_dir
   end
 end
-
-  
 

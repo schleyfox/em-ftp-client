@@ -120,8 +120,9 @@ module EventMachine
       end
 
       def call_callback(*args)
-        @callback.call(*args) if @callback
+        old_callback = @callback
         @callback = nil
+        old_callback.call(*args) if old_callback
       end
 
       def call_errback(*args)
@@ -165,6 +166,11 @@ module EventMachine
         @responder = :retr_response
       end
 
+      def list
+        send_data("LIST\r\n")
+        @responder = :list_response
+      end
+
       # handlers
       
       # Called after initial connection
@@ -186,39 +192,39 @@ module EventMachine
 
       # Called when a response for the TYPE verb is received
       def type_response(response)
-        call_callback
         @responder = nil
+        call_callback
       end
 
       # Called when a response for the CWD or CDUP is received
       def cwd_response(response)
-        call_callback
         @responder = nil
+        call_callback
       end
 
       # Called when a response for the PWD verb is received
       #
       # Calls out with the result to the callback given to pwd
       def pwd_response(response)
-        call_callback(response.body)
         @responder = nil
+        call_callback(response.body)
       end
 
       # Called when a response for the PASV verb is received
       #
       # Opens a new data connection and executes the callback
       def pasv_response(response)
-        if response.code = "227"
+        @responder = nil
+        if response.code == "227"
           if m = /(\d{1,3},\d{1,3},\d{1,3},\d{1,3}),(\d+),(\d+)/.match(response.body)
             host_ip = m[1].gsub(",", ".")
             host_port = m[2].to_i*256 + m[3].to_i
             pasv_callback = @callback
-            @data_connection = EM::Connection.connect(host_ip, host_port, DataConnection)
+            @data_connection = EM.connect(host_ip, host_port, DataConnection)
             @data_connection.on_connect &pasv_callback
             @data_connection.callback {|data| data_connection_closed(data) }
           end
         end
-        @responder = nil
       end
 
       def retr_response(response=nil)
@@ -233,13 +239,14 @@ module EventMachine
         elsif @data_connection
           #well we need to wait for a response
         else
-          call_callback(@data_buffer)
-          @data_buffer = nil
           @responder = nil
+          old_data_buffer = @data_buffer
+          @data_buffer = nil
+          call_callback(old_data_buffer)
         end
       end
 
-      def list_response(response)
+      def list_response(response=nil)
         if response && response.code != "226"
           @data_connection.close_connection
           @responder = nil
@@ -251,10 +258,11 @@ module EventMachine
         elsif @data_connection
           #well we need to wait for a response
         else
-          # parse it into a real form
-          call_callback(@data_buffer)
-          @data_buffer = nil
           @responder = nil
+          old_data_buffer = @data_buffer
+          @data_buffer = nil
+          # parse it into a real form
+          call_callback(old_data_buffer)
         end
       end
         

@@ -1,0 +1,38 @@
+em-ftp-client is a simple EventMachine based FTP Client supporting operations
+on stream data.  The primary interface is EventMachine::FtpClient::Session.  A
+standard usage would look like:
+
+    require 'eventmachine'
+    require 'em-ftp-client'
+    
+    EM.run do
+      EM::FtpClient::Session.new("0.0.0.0", 
+        :username => "test", 
+        :password => "1234") do |ftp|
+        
+        ftp.list do |l1|
+          puts l1
+          puts
+          ftp.cwd("files") do
+            ftp.list do |l2|
+              puts l2
+              puts
+              ftp.stream {|d| puts "STREAMING: #{d.inspect}" }
+              ftp.get("two.txt") do |t1|
+                puts "COMPLETED"
+                puts t1
+                puts
+                EM.stop
+              end
+            end
+          end
+        end
+      end
+    end
+
+This library also includes the class SyncSession, which uses fibers and works
+with em-synchrony.
+
+TODO:
+
+Add support for put/STOR operations

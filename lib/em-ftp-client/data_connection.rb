@@ -12,7 +12,7 @@ module EventMachine
       end
 
       def connection_completed
-        @on_connect.call if @on_connect
+        @on_connect.call(self) if @on_connect
       end
 
       def receive_data(data)
