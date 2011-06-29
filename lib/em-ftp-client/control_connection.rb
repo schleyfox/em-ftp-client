@@ -262,7 +262,10 @@ module EventMachine
           old_data_buffer = @data_buffer
           @data_buffer = nil
           # parse it into a real form
-          call_callback(old_data_buffer)
+          file_list = old_data_buffer.split("\r\n").map do |line|
+            ::Net::FTP::List.parse(line)
+          end
+          call_callback(file_list)
         end
       end
         

@@ -21,8 +21,10 @@ Gem::Specification.new do |s|
 
 
   s.add_dependency('eventmachine')
+  s.add_dependency('net-ftp-list')
 
   s.add_development_dependency('shoulda')
   s.add_development_dependency('mocha')
   s.add_development_dependency('redgreen')
+  s.add_development_dependency('rake')
 end
