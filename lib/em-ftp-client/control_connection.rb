@@ -198,8 +198,10 @@ module EventMachine
 
       # Called when a response for the CWD or CDUP is received
       def cwd_response(response)
-        @responder = nil
-        call_callback
+        if response && response.code != "226"
+          @responder = nil
+          call_callback
+        end
       end
 
       # Called when a response for the PWD verb is received
