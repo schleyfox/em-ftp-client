@@ -198,8 +198,10 @@ module EventMachine
 
       # Called when a response for the CWD or CDUP is received
       def cwd_response(response)
-        @responder = nil
-        call_callback
+        if response && response.code != "226"
+          @responder = nil
+          call_callback
+        end
       end
 
       # Called when a response for the PWD verb is received
@@ -262,8 +264,8 @@ module EventMachine
           old_data_buffer = @data_buffer
           @data_buffer = nil
           # parse it into a real form
-          file_list = old_data_buffer.split("\r\n").map do |line|
-            ::Net::FTP::List.parse(line)
+          file_list = old_data_buffer.split("\n").map do |line|
+            ::Net::FTP::List.parse(line.strip)
           end
           call_callback(file_list)
         end
