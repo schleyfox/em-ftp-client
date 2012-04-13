@@ -108,7 +108,7 @@ module EventMachine
       def data_connection_closed(data)
         @data_buffer = data
         @data_connection = nil
-        send(@responder) if @responder
+        send(@responder) if @responder and @response.complete?
       end
 
       def callback(&blk)
@@ -237,6 +237,7 @@ module EventMachine
         end
 
         if response && @data_connection
+          @response = response
           #well we still gots to wait for the file
         elsif @data_connection
           #well we need to wait for a response
