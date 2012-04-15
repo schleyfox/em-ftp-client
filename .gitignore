@@ -2,5 +2,5 @@
 .bundle
 Gemfile.lock
 pkg/*
-
+.idea
 test_client.rb
