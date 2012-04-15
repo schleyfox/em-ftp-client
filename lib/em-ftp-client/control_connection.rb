@@ -166,6 +166,11 @@ module EventMachine
         @responder = :retr_response
       end
 
+      def stor(filename)
+        send_data("STOR #{filename}\r\n")
+        @responder = :stor_response
+      end
+      
       def list
         send_data("LIST\r\n")
         @responder = :list_response
@@ -247,6 +252,18 @@ module EventMachine
           @data_buffer = nil
           call_callback(old_data_buffer)
         end
+      end
+
+      def stor_response(response=nil)
+        if response && response.code != "226"
+          @data_connection.close_connection
+          @responder = nil
+          error(response)
+        end
+
+        @responder = nil
+        @data_buffer = nil
+        call_callback
       end
 
       def list_response(response=nil)

@@ -47,6 +47,16 @@ module EventMachine
         end
         control_connection.pasv
       end
+
+      def put(file, &cb)
+        filename = File.basename(file)
+	      control_connection.callback do |data_connection|
+          data_connection.send_file(file)
+          control_connection.callback(&cb)
+          control_connection.stor filename
+        end
+        control_connection.pasv
+      end
     end
   end
 end
