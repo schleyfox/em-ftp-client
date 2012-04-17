@@ -299,6 +299,7 @@ module EventMachine
       
       def close_response(response=nil)
         close_connection
+        call_callback
       end
     end
   end
