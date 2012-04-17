@@ -57,6 +57,13 @@ module EventMachine
         end
         control_connection.pasv
       end
+
+      def close
+        @control_connection.callback do 
+          yield if block_given?
+        end
+        @control_connection.close
+      end
     end
   end
 end
