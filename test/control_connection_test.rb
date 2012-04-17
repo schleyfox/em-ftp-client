@@ -177,6 +177,7 @@ class ControlConnectionTest < Test::Unit::TestCase
       @control_connection.receive_line(set[2]+"\r\n") if set[2]
     end
 
+    # test RETR
     @control_connection.expects(:send_data).with("RETR foo.txt\r\n")
     @control_connection.retr("foo.txt")
 
@@ -188,6 +189,17 @@ class ControlConnectionTest < Test::Unit::TestCase
     @data_connection.receive_data("Bar")
     @data_connection.unbind
     assert retr_completed
+
+    # test STOR
+    @control_connection.expects(:send_data).with("STOR foo.txt\r\n")
+    @control_connection.stor("foo.txt")
+
+    stor_completed = false
+    @control_connection.callback {stor_completed = true }
+    assert !stor_completed
+    @data_connection.unbind
+    @control_connection.receive_line("226 Hooray\r\n")
+    assert stor_completed
 
     assert started
     assert_equal "\"/foo\"", working_dir

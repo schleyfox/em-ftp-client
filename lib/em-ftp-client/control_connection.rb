@@ -108,7 +108,7 @@ module EventMachine
       def data_connection_closed(data)
         @data_buffer = data
         @data_connection = nil
-        send(@responder) if @responder
+        send(@responder) if @responder and @response.complete?
       end
 
       def callback(&blk)
@@ -164,6 +164,19 @@ module EventMachine
       def retr(file)
         send_data("RETR #{file}\r\n")
         @responder = :retr_response
+      end
+
+      def stor(filename)
+        send_data("STOR #{filename}\r\n")
+        @responder = :stor_response
+      end
+      
+      def close
+        if @data_connection
+          raise "Can not close connection while data connection is still open"
+        end
+        send_data("QUIT\r\n")
+        @responder = :close_response
       end
 
       def list
@@ -237,6 +250,7 @@ module EventMachine
         end
 
         if response && @data_connection
+          @response = response
           #well we still gots to wait for the file
         elsif @data_connection
           #well we need to wait for a response
@@ -246,6 +260,18 @@ module EventMachine
           @data_buffer = nil
           call_callback(old_data_buffer)
         end
+      end
+
+      def stor_response(response=nil)
+        if response && response.code != "226"
+          @data_connection.close_connection
+          @responder = nil
+          error(response)
+        end
+
+        @responder = nil
+        @data_buffer = nil
+        call_callback
       end
 
       def list_response(response=nil)
@@ -270,7 +296,11 @@ module EventMachine
           call_callback(file_list)
         end
       end
-        
+      
+      def close_response(response=nil)
+        close_connection
+        call_callback
+      end
     end
   end
 end

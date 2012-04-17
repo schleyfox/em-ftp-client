@@ -17,12 +17,14 @@ standard usage would look like:
             ftp.list do |l2|
               puts l2
               puts
-              ftp.stream {|d| puts "STREAMING: #{d.inspect}" }
-              ftp.get("two.txt") do |t1|
-                puts "COMPLETED"
-                puts t1
-                puts
-                EM.stop
+              ftp.put("one.txt") do
+                ftp.stream {|d| puts "STREAMING: #{d.inspect}" }
+                ftp.get("two.txt") do |t1|
+                  puts "COMPLETED"
+                  puts t1
+                  puts
+                  EM.stop
+                end
               end
             end
           end
@@ -32,7 +34,3 @@ standard usage would look like:
 
 This library also includes the class SyncSession, which uses fibers and works
 with em-synchrony.
-
-TODO:
-
-Add support for put/STOR operations

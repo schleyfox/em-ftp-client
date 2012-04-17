@@ -22,6 +22,11 @@ module EventMachine
           @buf = ''
         end
       end
+      
+      def send_file(filename)
+	      send_file_data(filename)
+        close_connection_after_writing
+      end
 
       def unbind
         succeed(@buf)
