@@ -3,14 +3,19 @@ begin
 
   module EventMachine
     module FtpClient
+      class Error < StandardError
+        attr_accessor :response
+      end
+
       class SyncSession < Session
         def initialize(url, options={})
           f = Fiber.current
+
           super url, options do |conn|
             f.resume(conn)
           end
 
-          Fiber.yield
+          yield_with_error_handling
         end
 
         def pwd
@@ -19,7 +24,7 @@ begin
             f.resume(arg)
           end
 
-          Fiber.yield
+          yield_with_error_handling
         end
 
         def cwd(dir)
@@ -28,7 +33,7 @@ begin
             f.resume
           end
 
-          Fiber.yield
+          yield_with_error_handling
         end
 
         def list
@@ -37,7 +42,7 @@ begin
             f.resume(data)
           end
 
-          Fiber.yield
+          yield_with_error_handling
         end
 
         def get(file)
@@ -47,7 +52,24 @@ begin
             f.resume(data)
           end
 
-          Fiber.yield
+          yield_with_error_handling
+        end
+
+        private
+
+        def yield_with_error_handling
+          f = Fiber.current
+
+          error = nil
+          control_connection.errback { |response|
+            error = Error.new("FTP: #{response.code} #{response.body}")
+            error.response = response
+            f.resume
+          }
+
+          Fiber.yield.tap {
+            raise error if error
+          }
         end
       end
     end
