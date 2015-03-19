@@ -14,6 +14,9 @@ module EventMachine
         @control_connection = EM.connect(url, port, ControlConnection)
         @control_connection.username = username
         @control_connection.password = password
+        if options[:connect_timeout]
+          @control_connection.pending_connect_timeout = options[:connect_timeout]
+        end
         @control_connection.callback do
           cb.call(self)
         end

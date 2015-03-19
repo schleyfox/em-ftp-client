@@ -61,9 +61,15 @@ begin
           f = Fiber.current
 
           error = nil
-          control_connection.errback { |response|
-            error = Error.new("FTP: #{response.code} #{response.body}")
-            error.response = response
+          control_connection.errback { |response_or_exception|
+            error = if response_or_exception.is_a?(Exception)
+                      response_or_exception
+                    else
+                      response = response_or_exception
+                      Error.new("FTP: #{response.code} #{response.body}").tap { |err|
+                        err.response = response
+                      }
+                    end
             f.resume
           }
 

@@ -78,6 +78,11 @@ module EventMachine
   
       def connection_completed
         @responder = :receive_greetings
+        @connected = true
+      end
+
+      def unbind
+        error(Errno::ETIMEDOUT.new) unless @connected
       end
 
       def error(e)
