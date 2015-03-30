@@ -55,6 +55,15 @@ begin
           yield_with_error_handling
         end
 
+        def delete(file)
+          f = Fiber.current
+          super file do |data|
+            f.resume(data)
+          end
+
+          yield_with_error_handling
+        end
+
         private
 
         def yield_with_error_handling
