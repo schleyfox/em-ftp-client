@@ -184,6 +184,11 @@ module EventMachine
         @responder = :close_response
       end
 
+      def dele(filename)
+        send_data("DELE #{filename}\r\n")
+        @responder = :dele_response
+      end
+
       def list
         send_data("LIST\r\n")
         @responder = :list_response
@@ -220,6 +225,12 @@ module EventMachine
           @responder = nil
           call_callback
         end
+      end
+
+      # Called when a response for the DELE is received
+      def dele_response(response)
+        @responder = nil
+        call_callback
       end
 
       # Called when a response for the PWD verb is received
