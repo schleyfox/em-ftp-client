@@ -90,19 +90,20 @@ module EventMachine
       end
 
       def receive_line(line)
+        # get a new fresh response ready
+        if @response.complete?
+          @response = Response.new
+        end
         @response << line
         if @response.complete?
-          # get a new fresh response ready
-          old_response = @response
-          @response = Response.new
-
+          # Keep the @response since it is needed in data_connection_closed
           # dispatch appropriately
-          if old_response.success?
-            send(@responder, old_response) if @responder
-          elsif old_response.mark?
+          if @response.success?
+            send(@responder, @response) if @responder
+          elsif @response.mark?
             #maybe notice the mark or something
-          elsif old_response.failure?
-            error(old_response)
+          elsif @response.failure?
+            error(@response)
           end
         end
       rescue InvalidResponseFormat => e
@@ -248,6 +249,12 @@ module EventMachine
         @responder = nil
         if response.code == "227"
           if m = /(\d{1,3},\d{1,3},\d{1,3},\d{1,3}),(\d+),(\d+)/.match(response.body)
+            # Create a new response for handling the next request on the control connection, since
+            # currently @response is the response to pasv, and if the data connection completes
+            # before the next control request, data_connection_closed must not use the pasv
+            # response to check if the control response is complete (but get/list/etc response)
+            @response = Response.new
+
             host_ip = m[1].gsub(",", ".")
             host_port = m[2].to_i*256 + m[3].to_i
             pasv_callback = @callback
