@@ -4,3 +4,4 @@ Gemfile.lock
 pkg/*
 .idea
 test_client.rb
+.DS_Store
