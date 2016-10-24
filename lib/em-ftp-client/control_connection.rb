@@ -78,6 +78,11 @@ module EventMachine
   
       def connection_completed
         @responder = :receive_greetings
+        @connected = true
+      end
+
+      def unbind
+        error(Errno::ETIMEDOUT.new) unless @connected
       end
 
       def error(e)
@@ -85,19 +90,20 @@ module EventMachine
       end
 
       def receive_line(line)
+        # get a new fresh response ready
+        if @response.complete?
+          @response = Response.new
+        end
         @response << line
         if @response.complete?
-          # get a new fresh response ready
-          old_response = @response
-          @response = Response.new
-
+          # Keep the @response since it is needed in data_connection_closed
           # dispatch appropriately
-          if old_response.success?
-            send(@responder, old_response) if @responder
-          elsif old_response.mark?
+          if @response.success?
+            send(@responder, @response, @data_connection) if @responder
+          elsif @response.mark?
             #maybe notice the mark or something
-          elsif old_response.failure?
-            error(old_response)
+          elsif @response.failure?
+            error(@response)
           end
         end
       rescue InvalidResponseFormat => e
@@ -107,8 +113,9 @@ module EventMachine
 
       def data_connection_closed(data)
         @data_buffer = data
+        data_connection = @data_connection
         @data_connection = nil
-        send(@responder) if @responder and @response.complete?
+        send(@responder, nil, data_connection) if @responder and @response.complete?
       end
 
       def callback(&blk)
@@ -179,6 +186,11 @@ module EventMachine
         @responder = :close_response
       end
 
+      def dele(filename)
+        send_data("DELE #{filename}\r\n")
+        @responder = :dele_response
+      end
+
       def list
         send_data("LIST\r\n")
         @responder = :list_response
@@ -187,40 +199,46 @@ module EventMachine
       # handlers
       
       # Called after initial connection
-      def receive_greetings(banner)
+      def receive_greetings(banner, data_connection)
         if banner.code == "220"
           user username
         end
       end
 
       # Called when a response for the USER verb is received
-      def user_response(response)
+      def user_response(response, data_connection)
         pass password
       end
 
       # Called when a response for the PASS verb is received
-      def password_response(response)
+      def password_response(response, data_connection)
         type "I"
       end
 
       # Called when a response for the TYPE verb is received
-      def type_response(response)
+      def type_response(response, data_connection)
         @responder = nil
         call_callback
       end
 
       # Called when a response for the CWD or CDUP is received
-      def cwd_response(response)
+      def cwd_response(response, data_connection)
         if response && response.code != "226"
           @responder = nil
           call_callback
         end
       end
 
+      # Called when a response for the DELE is received
+      def dele_response(response, data_connection)
+        @responder = nil
+        call_callback
+      end
+
       # Called when a response for the PWD verb is received
       #
       # Calls out with the result to the callback given to pwd
-      def pwd_response(response)
+      def pwd_response(response, data_connection)
         @responder = nil
         call_callback(response.body)
       end
@@ -228,10 +246,16 @@ module EventMachine
       # Called when a response for the PASV verb is received
       #
       # Opens a new data connection and executes the callback
-      def pasv_response(response)
+      def pasv_response(response, data_connection)
         @responder = nil
         if response.code == "227"
           if m = /(\d{1,3},\d{1,3},\d{1,3},\d{1,3}),(\d+),(\d+)/.match(response.body)
+            # Create a new response for handling the next request on the control connection, since
+            # currently @response is the response to pasv, and if the data connection completes
+            # before the next control request, data_connection_closed must not use the pasv
+            # response to check if the control response is complete (but get/list/etc response)
+            @response = Response.new
+
             host_ip = m[1].gsub(",", ".")
             host_port = m[2].to_i*256 + m[3].to_i
             pasv_callback = @callback
@@ -242,17 +266,17 @@ module EventMachine
         end
       end
 
-      def retr_response(response=nil)
+      def retr_response(response, data_connection)
         if response && response.code != "226"
-          @data_connection.close_connection
+          data_connection.close_connection
           @responder = nil
           error(response)
         end
 
-        if response && @data_connection
+        if response && data_connection
           @response = response
           #well we still gots to wait for the file
-        elsif @data_connection
+        elsif data_connection
           #well we need to wait for a response
         else
           @responder = nil
@@ -262,9 +286,9 @@ module EventMachine
         end
       end
 
-      def stor_response(response=nil)
+      def stor_response(response, data_connection)
         if response && response.code != "226"
-          @data_connection.close_connection
+          data_connection.close_connection
           @responder = nil
           error(response)
         end
@@ -274,16 +298,16 @@ module EventMachine
         call_callback
       end
 
-      def list_response(response=nil)
+      def list_response(response, data_connection)
         if response && response.code != "226"
-          @data_connection.close_connection
+          data_connection.close_connection
           @responder = nil
           error(response)
         end
 
-        if response && @data_connection
+        if response && data_connection
           #well we still gots to wait for the file
-        elsif @data_connection
+        elsif data_connection
           #well we need to wait for a response
         else
           @responder = nil
@@ -297,7 +321,7 @@ module EventMachine
         end
       end
       
-      def close_response(response=nil)
+      def close_response(response, data_connection)
         close_connection
         call_callback
       end
